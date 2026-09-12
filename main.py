@@ -49,7 +49,7 @@ def post_page(request: Request, post_id: int, db: Annotated[Session, Depends(get
 
 
 
-app.get("/users/{user_id}/posts", include_in_schema=False, name="user_posts")
+@app.get("/users/{user_id}/posts", include_in_schema=False, name="user_posts")
 def user_posts_page(
     request: Request,
     user_id: int,
@@ -104,9 +104,9 @@ def create_user(user:UserCreate , db:Annotated[Session,Depends(get_db)]):
     return new_user
 
 
-@app.post("/api/users/{user_id}",response_model=UserResponse)
-def get_user(id:int,db:Annotated[Session,Depends(get_db)]):
-    result = db.execute(select(models.User).where(models.User.id == id))
+@app.get("/api/users/{user_id}", response_model=UserResponse)
+def get_user(user_id: int, db: Annotated[Session, Depends(get_db)]):
+    result = db.execute(select(models.User).where(models.User.id == user_id))
     user = result.scalars().first()
 
     if user:
