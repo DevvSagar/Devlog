@@ -14,7 +14,7 @@
           <div class="article-metadata mb-2">
             <a class="me-2"
                href="{{ url_for('user_posts', user_id=post.author.id) }}">{{ post.author.username }}</a>
-            <small class="text-body-secondary">{{ post.date_posted.strftime("%B %d, %Y") }}</small>
+            <small class="text-body-secondary"><time class="post-date" datetime="{{ post.date_posted.isoformat() }}Z">{{ post.date_posted | format_datetime }}</time></small>
           </div>
           <h2>
             <a class="article-title"
