@@ -23,6 +23,8 @@ class User(Base):
 
     # forward refrence
     posts: Mapped[list[Post]] = relationship(back_populates="author",cascade="all, delete-orphan")
+
+    
     reset_tokens: Mapped[list[PasswordResetToken]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
