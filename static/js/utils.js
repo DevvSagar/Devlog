@@ -46,3 +46,30 @@ if (document.readyState === "loading") {
 } else {
   formatLocalDates();
 }
+
+// utils.js - escapeHtml and formatDate
+// XSS prevention for dynamic content insertion
+export function escapeHtml(text) {
+  if (text == null) return "";
+  const div = document.createElement("div");
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Date formatting to match server's strftime("%B %d, %Y")
+export function formatDate(dateString) {
+  if (!dateString) return "";
+  const iso = dateString.endsWith("Z") || dateString.includes("+") ? dateString : dateString + "Z";
+  let date = new Date(iso);
+  if (isNaN(date.getTime())) {
+    date = new Date(dateString);
+  }
+  if (isNaN(date.getTime())) {
+    return dateString;
+  }
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
