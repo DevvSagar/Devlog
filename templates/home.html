@@ -1,27 +1,145 @@
 {% extends "layout.html" %}
 {% block content %}
-  {% for post in posts %}
-    <article class="content-section py-3 px-4 mb-4">
-      <div class="d-flex align-items-start gap-4">
-        <img class="rounded-circle article-img flex-shrink-0"
-             src="{{ post.author.image_path }}"
-             alt="{{ post.author.username }}'s profile picture"
-             width="64"
-             height="64"
-             loading="lazy">
-        <div class="flex-grow-1">
-          <div class="article-metadata mb-2">
-            <a class="me-2"
-               href="{{ url_for("user_posts", user_id=post.author.id) }}">{{ post.author.username }}</a>
-            <small class="text-body-secondary"><time class="post-date" datetime="{{ post.date_posted.isoformat() }}Z">{{ post.date_posted | format_datetime }}</time></small>
-          </div>
-          <h2>
-            <a class="article-title"
-               href="{{ url_for("post_page", post_id=post.id) }}">{{ post.title }}</a>
-          </h2>
-          <p class="article-content">{{ post.content }}</p>
+    <div id="postsContainer">
+        {% for post in posts %}
+            <article class="content-section py-3 px-4 mb-4">
+                <div class="d-flex align-items-start gap-4">
+                    <img class="rounded-circle article-img flex-shrink-0"
+                         src="{{ post.author.image_path }}"
+                         alt="{{ post.author.username }}'s profile picture"
+                         width="64"
+                         height="64"
+                         loading="lazy">
+                    <div class="flex-grow-1">
+                        <div class="article-metadata mb-2">
+                            <a class="me-2"
+                               href="{{ url_for("user_posts", user_id=post.author.id) }}">{{ post.author.username }}</a>
+                            <small class="text-body-secondary">{{ post.date_posted.strftime("%B %d, %Y") }}</small>
+                        </div>
+                        <h2>
+                            <a class="article-title"
+                               href="{{ url_for("post_page", post_id=post.id) }}">{{ post.title }}</a>
+                        </h2>
+                        <p class="article-content">{{ post.content }}</p>
+                    </div>
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+    {% if has_more %}
+        <div class="text-center mb-4" id="loadMoreContainer">
+            <button type="button"
+                    class="btn btn-outline-primary"
+                    id="loadMoreBtn"
+                    data-limit="{{ limit }}"
+                    data-offset="{{ limit }}">
+                Load More Posts
+            </button>
         </div>
-      </div>
-    </article>
-  {% endfor %}
+    {% endif %}
 {% endblock content %}
+{% block scripts %}
+    <script type="module">
+  import { escapeHtml, formatDate } from '/static/js/utils.js?v=2';
+
+  const postsContainer = document.getElementById('postsContainer');
+  const loadMoreBtn = document.getElementById('loadMoreBtn');
+  const loadMoreContainer = document.getElementById('loadMoreContainer');
+
+  // Pagination state read cleanly from HTML data attributes (fixes IDE "Property assignment expected" syntax errors)
+  const limit = loadMoreBtn ? (parseInt(loadMoreBtn.dataset.limit, 10) || 10) : 10;
+  let currentOffset = loadMoreBtn ? (parseInt(loadMoreBtn.dataset.offset, 10) || limit) : limit;
+  let hasMore = Boolean(loadMoreBtn);
+
+  // Create HTML for a single post (matching server-rendered structure)
+  function createPostHTML(post) {
+    const author = post.author || {};
+    const imagePath = author.image_path || '/static/profile_pics/default.jpg';
+    const username = author.username || 'Anonymous';
+    const userId = author.id || '';
+    const datePosted = formatDate(post.date_posted);
+    const title = escapeHtml(post.title || '');
+    const content = escapeHtml(post.content || '');
+
+    return `
+      <article class="content-section py-3 px-4 mb-4">
+        <div class="d-flex align-items-start gap-4">
+          <img class="rounded-circle article-img flex-shrink-0"
+               src="${escapeHtml(imagePath)}"
+               alt="${escapeHtml(username)}'s profile picture"
+               width="64"
+               height="64"
+               loading="lazy">
+          <div class="flex-grow-1">
+            <div class="article-metadata mb-2">
+              <a class="me-2" href="/users/${userId}/posts">${escapeHtml(username)}</a>
+              <small class="text-body-secondary">${datePosted}</small>
+            </div>
+            <h2>
+              <a class="article-title" href="/posts/${post.id}">${title}</a>
+            </h2>
+            <p class="article-content">${content}</p>
+          </div>
+        </div>
+      </article>
+    `;
+  }
+
+  // Load more posts from the API
+  async function loadMorePosts() {
+    if (!loadMoreBtn) return;
+
+    // Disable button and show loading state
+    loadMoreBtn.disabled = true;
+    loadMoreBtn.textContent = 'Loading...';
+
+    let errorOccurred = false;
+
+    try {
+      const response = await fetch(`/api/posts?skip=${currentOffset}&limit=${limit}`);
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch posts (${response.status})`);
+      }
+
+      const data = await response.json();
+      const posts = Array.isArray(data) ? data : (data.posts || []);
+
+      // Append new posts to the container
+      for (const post of posts) {
+        postsContainer.insertAdjacentHTML('beforeend', createPostHTML(post));
+      }
+
+      // Update pagination state
+      currentOffset += posts.length;
+      hasMore = data.has_more !== undefined ? data.has_more : (posts.length === limit);
+
+      // Hide button container if no more posts
+      if (!hasMore || posts.length === 0) {
+        if (loadMoreContainer) {
+          loadMoreContainer.classList.add('d-none');
+        } else {
+          loadMoreBtn.classList.add('d-none');
+        }
+      }
+    } catch (error) {
+      errorOccurred = true;
+      console.error('Error loading posts:', error);
+      // Show error message and keep button enabled for retry
+      loadMoreBtn.textContent = 'Error - Click to Retry';
+      loadMoreBtn.disabled = false;
+    } finally {
+      // Re-enable button and reset text only if no error occurred
+      if (!errorOccurred && hasMore) {
+        loadMoreBtn.disabled = false;
+        loadMoreBtn.textContent = 'Load More Posts';
+      }
+    }
+  }
+
+  // Add click handler if button exists
+  if (loadMoreBtn) {
+    loadMoreBtn.addEventListener('click', loadMorePosts);
+  }
+    </script>
+{% endblock scripts %}
